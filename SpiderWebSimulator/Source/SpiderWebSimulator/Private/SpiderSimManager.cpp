@@ -1,11 +1,13 @@
 #include "SpiderSimManager.h"
 #include "SpiderAIAgent.h"
+#include "SpiderSimConfig.h"
 #include "Engine/World.h"
 
 ASpiderSimManager::ASpiderSimManager()
 {
     PrimaryActorTick.bCanEverTick = false;
-    NumberOfSpiders = 5;
+    NumberOfSpiders = 1; // Default to 1 for easier testing
+    SimulationConfig = nullptr;
 }
 
 void ASpiderSimManager::BeginPlay()
@@ -16,6 +18,12 @@ void ASpiderSimManager::BeginPlay()
 
 void ASpiderSimManager::SpawnSpiders()
 {
+    if (!SimulationConfig)
+    {
+        UE_LOG(LogTemp, Error, TEXT("SpiderSimManager: SimulationConfig is not set!"));
+        return;
+    }
+
     if (SpiderAgentClass)
     {
         UWorld* World = GetWorld();
@@ -32,6 +40,9 @@ void ASpiderSimManager::SpawnSpiders()
                 ASpiderAIAgent* NewAgent = World->SpawnActor<ASpiderAIAgent>(SpiderAgentClass, SpawnLocation, SpawnRotation, SpawnParams);
                 if (NewAgent)
                 {
+                    NewAgent->SetConfig(SimulationConfig);
+                    // Set initial world state for testing
+                    NewAgent->UpdateWorldState(FName("HasSilk"), true);
                     UE_LOG(LogTemp, Warning, TEXT("Spawned spider agent: %s"), *NewAgent->GetName());
                 }
             }

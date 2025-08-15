@@ -5,6 +5,7 @@
 #include "SpiderSimManager.generated.h"
 
 class ASpiderAIAgent;
+class USpiderSimConfig;
 
 UCLASS()
 class SPIDERWEBSIMULATOR_API ASpiderSimManager : public AActor
@@ -13,6 +14,10 @@ class SPIDERWEBSIMULATOR_API ASpiderSimManager : public AActor
 
 public:
     ASpiderSimManager();
+
+    // The configuration data asset for this simulation
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Simulation")
+    USpiderSimConfig* SimulationConfig;
 
 protected:
     virtual void BeginPlay() override;
