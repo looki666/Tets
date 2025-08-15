@@ -1,0 +1,24 @@
+{
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "0.1",
+    "FriendlyName": "Spider Web Simulator",
+    "Description": "A plugin to simulate spider web creation using AI agents.",
+    "Category": "Simulation",
+    "CreatedBy": "Jules",
+    "CreatedByURL": "",
+    "DocsURL": "",
+    "MarketplaceURL": "",
+    "SupportURL": "",
+    "CanContainContent": true,
+    "IsBetaVersion": true,
+    "IsExperimentalVersion": false,
+    "Installed": false,
+    "Modules": [
+        {
+            "Name": "SpiderWebSimulator",
+            "Type": "Runtime",
+            "LoadingPhase": "Default"
+        }
+    ]
+}
