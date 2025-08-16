@@ -51,6 +51,7 @@ private:
     // --- Private Simulation Logic ---
     void Integrate(float DeltaTime);
     void SolveConstraints();
+    void HandleFlyInteractions(float DeltaTime);
 
     // --- Private Event Data ---
     TArray<FVector> VibrationEvents;
@@ -59,4 +60,8 @@ private:
 
     UPROPERTY(EditAnywhere, Category = "Web Physics|Events")
     float VibrationThreshold = 0.5f;
+
+    // --- Sticking Logic Data ---
+    UPROPERTY()
+    TMap<TObjectPtr<AFlyAgent>, int32> StuckFlies;
 };

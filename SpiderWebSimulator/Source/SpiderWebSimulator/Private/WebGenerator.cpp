@@ -60,7 +60,7 @@ void UWebGenerator::GenerateClassicOrb(TArray<FWebParticle>& OutParticles, TArra
         }
     }
 
-    // Radial constraints
+    // Radial constraints (not sticky)
     for (int32 i = 0; i < RadialThreads; ++i)
     {
         for (int32 r = 0; r < SpiralRings; ++r)
@@ -68,25 +68,26 @@ void UWebGenerator::GenerateClassicOrb(TArray<FWebParticle>& OutParticles, TArra
             int32 P1Index = RadialParticleIndices[r][i];
             int32 P2Index = RadialParticleIndices[r + 1][i];
             float Dist = FVector::Dist(OutParticles[P1Index].Position, OutParticles[P2Index].Position);
-            OutConstraints.Emplace(FWebConstraint(P1Index, P2Index, Dist, 0.95f));
+            OutConstraints.Emplace(FWebConstraint(P1Index, P2Index, Dist, 0.95f, false));
         }
     }
 
-    // Spiral constraints
-    for (int32 r = 0; r <= SpiralRings; ++r)
+    // Spiral constraints (sticky)
+    for (int32 r = 1; r <= SpiralRings; ++r) // Start from r=1 so the center hole isn't sticky
     {
         for (int32 i = 0; i < RadialThreads; ++i)
         {
             int32 P1Index = RadialParticleIndices[r][i];
             int32 P2Index = RadialParticleIndices[r][(i + 1) % RadialThreads];
             float Dist = FVector::Dist(OutParticles[P1Index].Position, OutParticles[P2Index].Position);
-            OutConstraints.Emplace(FWebConstraint(P1Index, P2Index, Dist, 0.85f));
+            OutConstraints.Emplace(FWebConstraint(P1Index, P2Index, Dist, 0.85f, true));
         }
     }
 }
 
 void UWebGenerator::GenerateFunnelWeb(TArray<FWebParticle>& OutParticles, TArray<FWebConstraint>& OutConstraints)
 {
+    // Funnel webs are generally sticky
     for (int32 l = 0; l <= SpiralRings; ++l)
     {
         float Depth = static_cast<float>(l) / SpiralRings * WebSize * 0.8f;
@@ -114,18 +115,19 @@ void UWebGenerator::GenerateFunnelWeb(TArray<FWebParticle>& OutParticles, TArray
             int32 P1_Radial = Offset1 + i;
             int32 P2_Radial = Offset2 + i;
             float DistRadial = FVector::Dist(OutParticles[P1_Radial].Position, OutParticles[P2_Radial].Position);
-            OutConstraints.Emplace(FWebConstraint(P1_Radial, P2_Radial, DistRadial));
+            OutConstraints.Emplace(FWebConstraint(P1_Radial, P2_Radial, DistRadial, 1.f, true));
 
             int32 P1_Circular = Offset1 + i;
             int32 P2_Circular = Offset1 + ((i + 1) % RadialThreads);
             float DistCircular = FVector::Dist(OutParticles[P1_Circular].Position, OutParticles[P2_Circular].Position);
-            OutConstraints.Emplace(FWebConstraint(P1_Circular, P2_Circular, DistCircular));
+            OutConstraints.Emplace(FWebConstraint(P1_Circular, P2_Circular, DistCircular, 1.f, true));
         }
     }
 }
 
 void UWebGenerator::GenerateSheetWeb(TArray<FWebParticle>& OutParticles, TArray<FWebConstraint>& OutConstraints)
 {
+    // Sheet webs are sticky
     int32 Rows = SpiralRings;
     int32 Cols = RadialThreads;
     float Spacing = WebSize / FMath::Max(Rows, Cols);
@@ -153,14 +155,14 @@ void UWebGenerator::GenerateSheetWeb(TArray<FWebParticle>& OutParticles, TArray<
                 int32 P1 = Index;
                 int32 P2 = Index + 1;
                 float Dist = FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position);
-                OutConstraints.Emplace(FWebConstraint(P1, P2, Dist));
+                OutConstraints.Emplace(FWebConstraint(P1, P2, Dist, 1.f, true));
             }
             if (r < Rows)
             {
                 int32 P1 = Index;
                 int32 P2 = Index + Cols + 1;
                 float Dist = FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position);
-                OutConstraints.Emplace(FWebConstraint(P1, P2, Dist));
+                OutConstraints.Emplace(FWebConstraint(P1, P2, Dist, 1.f, true));
             }
         }
     }
@@ -168,6 +170,7 @@ void UWebGenerator::GenerateSheetWeb(TArray<FWebParticle>& OutParticles, TArray<
 
 void UWebGenerator::GenerateCobweb(TArray<FWebParticle>& OutParticles, TArray<FWebConstraint>& OutConstraints)
 {
+    // Cobwebs are very sticky
     int32 Points = RadialThreads * 2;
     for (int32 i = 0; i < Points; ++i)
     {
@@ -199,7 +202,7 @@ void UWebGenerator::GenerateCobweb(TArray<FWebParticle>& OutParticles, TArray<FW
 
             if (!bExists && Distances[c].Key < WebSize * 0.5f)
             {
-                OutConstraints.Emplace(FWebConstraint(i, j, Distances[c].Key * (1.f + FMath::FRand() * Irregularity)));
+                OutConstraints.Emplace(FWebConstraint(i, j, Distances[c].Key * (1.f + FMath::FRand() * Irregularity), 1.f, true));
             }
         }
     }
@@ -207,6 +210,7 @@ void UWebGenerator::GenerateCobweb(TArray<FWebParticle>& OutParticles, TArray<FW
 
 void UWebGenerator::GenerateTriangularWeb(TArray<FWebParticle>& OutParticles, TArray<FWebConstraint>& OutConstraints)
 {
+    // Assume all threads are sticky
     TArray<TArray<int32>> ParticleIndices;
     int32 Levels = SpiralRings;
 
@@ -236,13 +240,13 @@ void UWebGenerator::GenerateTriangularWeb(TArray<FWebParticle>& OutParticles, TA
             int32 P2_1 = ParticleIndices[l + 1][i];
             int32 P2_2 = ParticleIndices[l + 1][i + 1];
 
-            OutConstraints.Emplace(FWebConstraint(P1, P2_1, FVector::Dist(OutParticles[P1].Position, OutParticles[P2_1].Position)));
-            OutConstraints.Emplace(FWebConstraint(P1, P2_2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2_2].Position)));
+            OutConstraints.Emplace(FWebConstraint(P1, P2_1, FVector::Dist(OutParticles[P1].Position, OutParticles[P2_1].Position), 1.f, true));
+            OutConstraints.Emplace(FWebConstraint(P1, P2_2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2_2].Position), 1.f, true));
 
             if (i < ParticleIndices[l].Num() - 1)
             {
                 int32 P_Horizontal = ParticleIndices[l][i+1];
-                OutConstraints.Emplace(FWebConstraint(P1, P_Horizontal, FVector::Dist(OutParticles[P1].Position, OutParticles[P_Horizontal].Position)));
+                OutConstraints.Emplace(FWebConstraint(P1, P_Horizontal, FVector::Dist(OutParticles[P1].Position, OutParticles[P_Horizontal].Position), 1.f, true));
             }
         }
     }
@@ -252,7 +256,7 @@ void UWebGenerator::GenerateTriangularWeb(TArray<FWebParticle>& OutParticles, TA
     {
         int32 P1 = LastRow[i];
         int32 P2 = LastRow[i + 1];
-        OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position)));
+        OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 1.f, true));
     }
 }
 
@@ -282,13 +286,14 @@ void UWebGenerator::GenerateSpiralGalaxy(TArray<FWebParticle>& OutParticles, TAr
         }
     }
 
+    // Arm threads are sticky
     for (int32 a = 0; a < Arms; ++a)
     {
         for (int32 i = 0; i < ArmParticleIndices[a].Num() - 1; ++i)
         {
             int32 P1 = ArmParticleIndices[a][i];
             int32 P2 = ArmParticleIndices[a][i + 1];
-            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position)));
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 1.f, true));
         }
     }
 
@@ -300,7 +305,7 @@ void UWebGenerator::GenerateSpiralGalaxy(TArray<FWebParticle>& OutParticles, TAr
         {
             const int32 P1 = ArmParticleIndices[a][i];
             const int32 P2 = ArmParticleIndices[NextArm][i];
-            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 0.5f));
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 0.5f, false)); // Connecting threads not sticky
         }
     }
 }
@@ -333,23 +338,25 @@ void UWebGenerator::GenerateRadialBurst(TArray<FWebParticle>& OutParticles, TArr
         }
     }
 
+    // Radial threads are not sticky
     for (int32 r = 0; r < Rays; ++r)
     {
         for (int32 i = 0; i < RayParticleIndices[r].Num() - 1; ++i)
         {
             int32 P1 = RayParticleIndices[r][i];
             int32 P2 = RayParticleIndices[r][i + 1];
-            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position)));
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 1.f, false));
         }
     }
 
+    // Circular connections are sticky
     for (int32 s = 2; s <= Segments; s += 2)
     {
         for (int32 r = 0; r < Rays; ++r)
         {
             int32 P1 = RayParticleIndices[r][s];
             int32 P2 = RayParticleIndices[(r + 1) % Rays][s];
-            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 0.6f));
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 0.6f, true));
         }
     }
 }

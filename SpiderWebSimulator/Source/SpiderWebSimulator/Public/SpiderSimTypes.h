@@ -102,6 +102,13 @@ struct SPIDERWEBSIMULATOR_API FWebConstraint
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Web Constraint")
     float Stress;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Web Constraint")
+    bool bIsSticky;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Web Constraint", meta = (EditCondition = "bIsSticky"))
+    float Stickiness;
+
+
     FWebConstraint()
         : Particle1Index(0)
         , Particle2Index(0)
@@ -109,14 +116,18 @@ struct SPIDERWEBSIMULATOR_API FWebConstraint
         , Stiffness(1.0f)
         , bIsBroken(false)
         , Stress(0.f)
+        , bIsSticky(false)
+        , Stickiness(1.0f)
     {}
 
-    FWebConstraint(int32 InP1, int32 InP2, float InRestLength, float InStiffness = 1.0f)
+    FWebConstraint(int32 InP1, int32 InP2, float InRestLength, float InStiffness = 1.0f, bool InIsSticky = false, float InStickiness = 1.0f)
         : Particle1Index(InP1)
         , Particle2Index(InP2)
         , RestLength(InRestLength)
         , Stiffness(InStiffness)
         , bIsBroken(false)
         , Stress(0.f)
+        , bIsSticky(InIsSticky)
+        , Stickiness(InStickiness)
     {}
 };

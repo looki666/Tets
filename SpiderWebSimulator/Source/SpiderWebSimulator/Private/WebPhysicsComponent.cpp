@@ -1,5 +1,7 @@
 #include "WebPhysicsComponent.h"
 #include "SpiderSimTypes.h"
+#include "FlyAgent.h"
+#include "EngineUtils.h"
 
 UWebPhysicsComponent::UWebPhysicsComponent()
 {
@@ -17,8 +19,18 @@ void UWebPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 
     WindTime += DeltaTime;
 
+    HandleFlyInteractions(DeltaTime);
     Integrate(DeltaTime);
     SolveConstraints();
+
+    // Update stuck flies positions after the simulation step
+    for (auto const& [Fly, ParticleIndex] : StuckFlies)
+    {
+        if (Fly && Particles.IsValidIndex(ParticleIndex))
+        {
+            Fly->SetActorLocation(Particles[ParticleIndex].Position);
+        }
+    }
 }
 
 void UWebPhysicsComponent::Initialize(TArray<FWebParticle>&& InParticles, TArray<FWebConstraint>&& InConstraints)
@@ -27,6 +39,7 @@ void UWebPhysicsComponent::Initialize(TArray<FWebParticle>&& InParticles, TArray
     Constraints = MoveTemp(InConstraints);
     LastFrameStress.Empty();
     VibrationEvents.Empty();
+    StuckFlies.Empty();
 }
 
 void UWebPhysicsComponent::ClearWeb()
@@ -35,6 +48,7 @@ void UWebPhysicsComponent::ClearWeb()
     Constraints.Empty();
     LastFrameStress.Empty();
     VibrationEvents.Empty();
+    StuckFlies.Empty();
 }
 
 void UWebPhysicsComponent::Integrate(float DeltaTime)
@@ -68,6 +82,61 @@ void UWebPhysicsComponent::Integrate(float DeltaTime)
         }
     }
 }
+
+void UWebPhysicsComponent::HandleFlyInteractions(float DeltaTime)
+{
+    if (!GetWorld()) return;
+
+    for (TActorIterator<AFlyAgent> It(GetWorld()); It; ++It)
+    {
+        AFlyAgent* Fly = *It;
+        if (Fly && !Fly->bIsStuck)
+        {
+            FVector FlyLocation = Fly->GetActorLocation();
+            float FlyRadius = Fly->CollisionSphere->GetScaledSphereRadius();
+
+            for (const auto& Constraint : Constraints)
+            {
+                if (Constraint.bIsSticky && !Constraint.bIsBroken)
+                {
+                    const FVector P1 = Particles[Constraint.Particle1Index].Position;
+                    const FVector P2 = Particles[Constraint.Particle2Index].Position;
+
+                    FVector ClosestPoint = FMath::ClosestPointOnSegment(FlyLocation, P1, P2);
+                    float DistSq = FVector::DistSquared(FlyLocation, ClosestPoint);
+
+                    if (DistSq < FMath::Square(FlyRadius + 10.f)) // 10.f is a stickiness threshold
+                    {
+                        Fly->bIsStuck = true;
+
+                        // Create a new particle for the fly
+                        int32 FlyParticleIndex = Particles.Emplace(FWebParticle(FlyLocation, false));
+                        StuckFlies.Add(Fly, FlyParticleIndex);
+
+                        // Attach the fly particle to the web
+                        float Dist1 = FVector::Dist(FlyLocation, P1);
+                        float Dist2 = FVector::Dist(FlyLocation, P2);
+                        Constraints.Emplace(FWebConstraint(FlyParticleIndex, Constraint.Particle1Index, Dist1, 2.0f, false));
+                        Constraints.Emplace(FWebConstraint(FlyParticleIndex, Constraint.Particle2Index, Dist2, 2.0f, false));
+
+                        break; // Fly is stuck, move to the next fly
+                    }
+                }
+            }
+        }
+        else if (Fly && Fly->bIsStuck && StuckFlies.Contains(Fly))
+        {
+            // Apply the fly's struggle force to the particle
+            int32 ParticleIndex = StuckFlies[Fly];
+            if (Particles.IsValidIndex(ParticleIndex))
+            {
+                FVector StruggleForce = FMath::VRand() * 5000.f; // Fly struggles randomly
+                Particles[ParticleIndex].ApplyForce(StruggleForce);
+            }
+        }
+    }
+}
+
 
 TArray<FVector> UWebPhysicsComponent::GetAndClearVibrationEvents()
 {
