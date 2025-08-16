@@ -51,6 +51,33 @@ void UWebPhysicsComponent::ClearWeb()
     StuckFlies.Empty();
 }
 
+void UWebPhysicsComponent::RemoveStuckFly(AFlyAgent* FlyToRemove)
+{
+    if (!FlyToRemove || !StuckFlies.Contains(FlyToRemove))
+    {
+        return;
+    }
+
+    int32 FlyParticleIndex = StuckFlies[FlyToRemove];
+    StuckFlies.Remove(FlyToRemove);
+
+    if (Particles.IsValidIndex(FlyParticleIndex))
+    {
+        // Mark the particle as inactive instead of removing it to preserve indices.
+        // A more robust system would have a particle pooling or defragmentation strategy.
+        // For now, we pin it to a far-away location to effectively remove it from simulation.
+        Particles[FlyParticleIndex].bIsPinned = true;
+        Particles[FlyParticleIndex].Position = FVector(0,0, -100000);
+
+        // Remove constraints attached to this particle
+        Constraints.RemoveAll([&](const FWebConstraint& Constraint)
+        {
+            return Constraint.Particle1Index == FlyParticleIndex || Constraint.Particle2Index == FlyParticleIndex;
+        });
+    }
+}
+
+
 void UWebPhysicsComponent::Integrate(float DeltaTime)
 {
     // This is a single step of Verlet integration

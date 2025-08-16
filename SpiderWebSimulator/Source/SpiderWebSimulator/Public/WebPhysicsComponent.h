@@ -43,6 +43,7 @@ public:
     // --- Public Functions ---
     void Initialize(TArray<FWebParticle>&& InParticles, TArray<FWebConstraint>&& InConstraints);
     void ClearWeb();
+    void RemoveStuckFly(AFlyAgent* FlyToRemove);
 
     // --- Public Event Data ---
     TArray<FVector> GetAndClearVibrationEvents();

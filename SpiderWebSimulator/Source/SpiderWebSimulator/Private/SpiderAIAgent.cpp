@@ -6,6 +6,7 @@
 #include "GOAPCore.h"
 #include "SpiderSimConfig.h"
 #include "SpiderSimTypes.h"
+#include "FlyAgent.h"
 
 ASpiderAIAgent::ASpiderAIAgent()
 {
@@ -40,27 +41,38 @@ void ASpiderAIAgent::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    // Update hunger
+    Hunger = FMath::Max(0.f, Hunger - HungerDepletionRate * DeltaTime);
+    UpdateWorldState(FName("bIsHungry"), Hunger < HungerThreshold);
+
+
     // Update world state based on the environment
-    if (PhysicsComponent && PhysicsComponent->Constraints.Num() > 0)
+    if (PhysicsComponent)
     {
-        bool bAnyBroken = false;
-        for (const auto& Constraint : PhysicsComponent->Constraints)
+        if (PhysicsComponent->Constraints.Num() > 0)
         {
-            if (Constraint.bIsBroken)
+            bool bAnyBroken = false;
+            for (const auto& Constraint : PhysicsComponent->Constraints)
             {
-                bAnyBroken = true;
-                break;
+                if (Constraint.bIsBroken)
+                {
+                    bAnyBroken = true;
+                    break;
+                }
+            }
+            UpdateWorldState(FName("bWebIsDamaged"), bAnyBroken);
+
+            // Check for new vibrations
+            TArray<FVector> NewVibrations = PhysicsComponent->GetAndClearVibrationEvents();
+            if (NewVibrations.Num() > 0)
+            {
+                VibrationEvents.Append(NewVibrations);
+                UpdateWorldState(FName("bHasDisturbance"), true);
             }
         }
-        UpdateWorldState(FName("bWebIsDamaged"), bAnyBroken);
 
-        // Check for new vibrations
-        TArray<FVector> NewVibrations = PhysicsComponent->GetAndClearVibrationEvents();
-        if (NewVibrations.Num() > 0)
-        {
-            VibrationEvents.Append(NewVibrations);
-            UpdateWorldState(FName("bHasDisturbance"), true);
-        }
+        // Check for prey on the web
+        UpdateWorldState(FName("bHasPreyOnWeb"), PhysicsComponent->StuckFlies.Num() > 0);
     }
 
     UpdateGOAP();

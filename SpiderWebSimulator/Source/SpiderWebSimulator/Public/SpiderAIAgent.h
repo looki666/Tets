@@ -67,6 +67,16 @@ public:
     // This is populated by the Tick function when vibrations are detected
     TArray<FVector> VibrationEvents;
 
+    // --- AI State Properties ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|State")
+    float Hunger = 100.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|State")
+    float HungerThreshold = 30.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI|State")
+    float HungerDepletionRate = 0.1f;
+
 private:
     // --- Private GOAP Logic ---
     void UpdateGOAP();
