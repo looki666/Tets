@@ -1,14 +1,22 @@
 #include "SpiderAIAgent.h"
 #include "WebbingComponent.h"
+#include "WebPhysicsComponent.h"
+#include "WebGenerator.h"
 #include "GOAPPlanner.h"
 #include "GOAPCore.h"
 #include "SpiderSimConfig.h"
+#include "SpiderSimTypes.h"
 
 ASpiderAIAgent::ASpiderAIAgent()
 {
     PrimaryActorTick.bCanEverTick = true;
+
+    PhysicsComponent = CreateDefaultSubobject<UWebPhysicsComponent>(TEXT("PhysicsComponent"));
     WebbingComponent = CreateDefaultSubobject<UWebbingComponent>(TEXT("WebbingComponent"));
+    WebGenerator = CreateDefaultSubobject<UWebGenerator>(TEXT("WebGenerator"));
     Planner = CreateDefaultSubobject<UGOAPPlanner>(TEXT("GOAPPlanner"));
+
+    WebbingComponent->PhysicsComponent = PhysicsComponent;
 
     TimeSinceLastPlan = 0.f;
     CurrentGoal = nullptr;
@@ -31,6 +39,30 @@ void ASpiderAIAgent::BeginPlay()
 void ASpiderAIAgent::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+
+    // Update world state based on the environment
+    if (PhysicsComponent && PhysicsComponent->Constraints.Num() > 0)
+    {
+        bool bAnyBroken = false;
+        for (const auto& Constraint : PhysicsComponent->Constraints)
+        {
+            if (Constraint.bIsBroken)
+            {
+                bAnyBroken = true;
+                break;
+            }
+        }
+        UpdateWorldState(FName("bWebIsDamaged"), bAnyBroken);
+
+        // Check for new vibrations
+        TArray<FVector> NewVibrations = PhysicsComponent->GetAndClearVibrationEvents();
+        if (NewVibrations.Num() > 0)
+        {
+            VibrationEvents.Append(NewVibrations);
+            UpdateWorldState(FName("bHasDisturbance"), true);
+        }
+    }
+
     UpdateGOAP();
 }
 
@@ -43,6 +75,26 @@ void ASpiderAIAgent::UpdateWorldState(FName Key, bool Value)
 {
     CurrentWorldState.States.FindOrAdd(Key) = Value;
 }
+
+int32 ASpiderAIAgent::FindClosestParticleToLocation(const FVector& Location) const
+{
+    int32 ClosestParticleIndex = -1;
+    float MinDistSq = TNumericLimits<float>::Max();
+
+    if (!PhysicsComponent) return -1;
+
+    for (int32 i = 0; i < PhysicsComponent->Particles.Num(); ++i)
+    {
+        float DistSq = FVector::DistSquared(Location, PhysicsComponent->Particles[i].Position);
+        if (DistSq < MinDistSq)
+        {
+            MinDistSq = DistSq;
+            ClosestParticleIndex = i;
+        }
+    }
+    return ClosestParticleIndex;
+}
+
 
 void ASpiderAIAgent::UpdateGOAP()
 {
@@ -60,7 +112,6 @@ void ASpiderAIAgent::FindNewPlan()
 {
     TimeSinceLastPlan = 0.f;
 
-    // Find the highest priority goal
     UGOAPGoal* BestGoal = nullptr;
     float MaxPriority = -1.f;
 

@@ -6,6 +6,8 @@
 #include "SpiderAIAgent.generated.h"
 
 class UWebbingComponent;
+class UWebPhysicsComponent;
+class UWebGenerator;
 class UGOAPPlanner;
 class UGOAPAction;
 class UGOAPGoal;
@@ -20,7 +22,14 @@ public:
     ASpiderAIAgent();
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-    UWebbingComponent* WebbingComponent;
+    TObjectPtr<UWebbingComponent> WebbingComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    TObjectPtr<UWebPhysicsComponent> PhysicsComponent;
+
+    // --- AI Properties ---
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced, Category = "AI")
+    TObjectPtr<UWebGenerator> WebGenerator;
 
     // --- GOAP Properties ---
 
@@ -51,6 +60,12 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "GOAP")
     void UpdateWorldState(FName Key, bool Value);
+
+    int32 FindClosestParticleToLocation(const FVector& Location) const;
+
+    // --- Public Data ---
+    // This is populated by the Tick function when vibrations are detected
+    TArray<FVector> VibrationEvents;
 
 private:
     // --- Private GOAP Logic ---

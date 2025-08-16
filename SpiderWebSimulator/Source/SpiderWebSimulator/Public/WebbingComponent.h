@@ -5,6 +5,7 @@
 #include "WebbingComponent.generated.h"
 
 class UProceduralMeshComponent;
+class UWebPhysicsComponent;
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class SPIDERWEBSIMULATOR_API UWebbingComponent : public UActorComponent
@@ -16,16 +17,34 @@ public:
 
     // The main component for rendering the web mesh
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Webbing")
-    UProceduralMeshComponent* ProceduralMesh;
+    TObjectPtr<UProceduralMeshComponent> ProceduralMesh;
 
-    // Adds a single thread to the web geometry
-    UFUNCTION(BlueprintCallable, Category = "Webbing")
-    void AddWebThread(const FVector& Start, const FVector& End, float Thickness);
+    // The physics component that drives the web simulation
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Webbing")
+    TObjectPtr<UWebPhysicsComponent> PhysicsComponent;
+
+    // --- Visual Properties ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Webbing|Visuals")
+    float ThreadThickness = 2.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Webbing|Visuals")
+    FLinearColor ThreadColor = FLinearColor::White;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Webbing|Visuals")
+    bool bShowStressColors = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Webbing|Visuals", meta = (EditCondition = "bShowStressColors"))
+    FLinearColor LowStressColor = FLinearColor::White;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Webbing|Visuals", meta = (EditCondition = "bShowStressColors"))
+    FLinearColor HighStressColor = FLinearColor::Red;
 
 protected:
+    //~ Begin UActorComponent Interface
     virtual void BeginPlay() override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+    //~ End UActorComponent Interface
 
 private:
-    // Keeps track of the current mesh section index
-    int32 CurrentMeshSectionIndex;
+    void UpdateWebMesh();
 };
