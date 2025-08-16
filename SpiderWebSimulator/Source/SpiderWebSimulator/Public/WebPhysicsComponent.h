@@ -30,6 +30,12 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Web Physics")
     float BreakThreshold = 8.0f;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Web Physics|Wind")
+    FVector WindStrength = FVector(50.f, 0.f, 0.f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Web Physics|Wind")
+    float WindTurbulence = 0.3f;
+
     // --- Public Data Access ---
     TArray<FWebParticle> Particles;
     TArray<FWebConstraint> Constraints;
@@ -38,7 +44,6 @@ public:
     void Initialize(TArray<FWebParticle>&& InParticles, TArray<FWebConstraint>&& InConstraints);
     void ClearWeb();
 
-public:
     // --- Public Event Data ---
     TArray<FVector> GetAndClearVibrationEvents();
 
@@ -50,6 +55,7 @@ private:
     // --- Private Event Data ---
     TArray<FVector> VibrationEvents;
     TMap<int32, float> LastFrameStress;
+    float WindTime = 0.f;
 
     UPROPERTY(EditAnywhere, Category = "Web Physics|Events")
     float VibrationThreshold = 0.5f;

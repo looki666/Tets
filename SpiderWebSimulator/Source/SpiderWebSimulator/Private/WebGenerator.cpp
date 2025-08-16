@@ -164,15 +164,6 @@ void UWebGenerator::GenerateSheetWeb(TArray<FWebParticle>& OutParticles, TArray<
             }
         }
     }
-
-    // Connect the last row horizontally
-    TArray<int32>& LastRow = ParticleIndices[Levels];
-    for (int32 i = 0; i < LastRow.Num() - 1; ++i)
-    {
-        int32 P1 = LastRow[i];
-        int32 P2 = LastRow[i + 1];
-        OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position)));
-    }
 }
 
 void UWebGenerator::GenerateCobweb(TArray<FWebParticle>& OutParticles, TArray<FWebConstraint>& OutConstraints)
@@ -255,18 +246,110 @@ void UWebGenerator::GenerateTriangularWeb(TArray<FWebParticle>& OutParticles, TA
             }
         }
     }
+
+    TArray<int32>& LastRow = ParticleIndices[Levels];
+    for (int32 i = 0; i < LastRow.Num() - 1; ++i)
+    {
+        int32 P1 = LastRow[i];
+        int32 P2 = LastRow[i + 1];
+        OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position)));
+    }
 }
 
 void UWebGenerator::GenerateSpiralGalaxy(TArray<FWebParticle>& OutParticles, TArray<FWebConstraint>& OutConstraints)
 {
-    // Implementation left as an exercise for the reader :)
-    // For now, it will just generate a classic orb web.
-    GenerateClassicOrb(OutParticles, OutConstraints);
+    const int32 Arms = 3;
+    const int32 PointsPerArm = RadialThreads * 2;
+
+    TArray<TArray<int32>> ArmParticleIndices;
+    ArmParticleIndices.SetNum(Arms);
+
+    for (int32 a = 0; a < Arms; ++a)
+    {
+        float ArmAngle = (static_cast<float>(a) / Arms) * 2.f * PI;
+        for (int32 i = 0; i <= PointsPerArm; ++i)
+        {
+            float t = static_cast<float>(i) / PointsPerArm;
+            float Radius = t * WebSize;
+            float Angle = ArmAngle + t * PI * 3.f;
+            float X = FMath::Cos(Angle) * Radius;
+            float Y = FMath::Sin(Angle) * Radius;
+            float Z = FMath::Sin(t * PI * 2.f) * ZDepth;
+
+            bool bIsPinned = i == 0 || i == PointsPerArm;
+            int32 Index = OutParticles.Emplace(FWebParticle(FVector(X, Y, Z), bIsPinned));
+            ArmParticleIndices[a].Add(Index);
+        }
+    }
+
+    for (int32 a = 0; a < Arms; ++a)
+    {
+        for (int32 i = 0; i < ArmParticleIndices[a].Num() - 1; ++i)
+        {
+            int32 P1 = ArmParticleIndices[a][i];
+            int32 P2 = ArmParticleIndices[a][i + 1];
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position)));
+        }
+    }
+
+    const int32 ParticlesPerArm = PointsPerArm + 1;
+    for (int32 a = 0; a < Arms; ++a)
+    {
+        const int32 NextArm = (a + 1) % Arms;
+        for (int32 i = 0; i < ParticlesPerArm; i += 3)
+        {
+            const int32 P1 = ArmParticleIndices[a][i];
+            const int32 P2 = ArmParticleIndices[NextArm][i];
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 0.5f));
+        }
+    }
 }
 
 void UWebGenerator::GenerateRadialBurst(TArray<FWebParticle>& OutParticles, TArray<FWebConstraint>& OutConstraints)
 {
-    // Implementation left as an exercise for the reader :)
-    // For now, it will just generate a classic orb web.
-    GenerateClassicOrb(OutParticles, OutConstraints);
+    const int32 Rays = RadialThreads;
+    const int32 Segments = SpiralRings;
+
+    int32 CenterIndex = OutParticles.Emplace(FWebParticle(FVector::ZeroVector, true));
+
+    TArray<TArray<int32>> RayParticleIndices;
+    RayParticleIndices.SetNum(Rays);
+
+    for (int32 r = 0; r < Rays; ++r)
+    {
+        RayParticleIndices[r].Add(CenterIndex);
+        float Angle = (static_cast<float>(r) / Rays) * 2.f * PI;
+        for (int32 s = 1; s <= Segments; ++s)
+        {
+            float Dist = (static_cast<float>(s) / Segments) * WebSize;
+            float Wobble = FMath::Sin(s * 0.5f) * Irregularity;
+            float X = FMath::Cos(Angle + Wobble) * Dist;
+            float Y = FMath::Sin(Angle + Wobble) * Dist;
+            float Z = FMath::Sin(s * 0.3f) * ZDepth;
+
+            bool bIsPinned = s == Segments && r % 4 == 0;
+            int32 Index = OutParticles.Emplace(FWebParticle(FVector(X, Y, Z), bIsPinned));
+            RayParticleIndices[r].Add(Index);
+        }
+    }
+
+    for (int32 r = 0; r < Rays; ++r)
+    {
+        for (int32 i = 0; i < RayParticleIndices[r].Num() - 1; ++i)
+        {
+            int32 P1 = RayParticleIndices[r][i];
+            int32 P2 = RayParticleIndices[r][i + 1];
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position)));
+        }
+    }
+
+    for (int32 s = 2; s <= Segments; s += 2)
+    {
+        for (int32 r = 0; r < Rays; ++r)
+        {
+            int32 P1 = RayParticleIndices[r][s];
+            int32 P2 = RayParticleIndices[(r + 1) % Rays][s];
+            OutConstraints.Emplace(FWebConstraint(P1, P2, FVector::Dist(OutParticles[P1].Position, OutParticles[P2].Position), 0.6f));
+        }
+    }
 }

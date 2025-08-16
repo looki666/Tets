@@ -15,6 +15,8 @@ void UWebPhysicsComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
         return;
     }
 
+    WindTime += DeltaTime;
+
     Integrate(DeltaTime);
     SolveConstraints();
 }
@@ -42,8 +44,19 @@ void UWebPhysicsComponent::Integrate(float DeltaTime)
     {
         if (!Particle.bIsPinned)
         {
-            // Apply external forces (like gravity)
+            // Apply external forces
             Particle.ApplyForce(Gravity);
+
+            // Apply wind force with turbulence
+            if (WindStrength.SizeSquared() > 0.f)
+            {
+                FVector Turbulence = FVector(
+                    FMath::PerlinNoise3D(Particle.Position * 0.01f + FVector(WindTime * 0.5f)),
+                    FMath::PerlinNoise3D(Particle.Position * 0.01f + FVector(WindTime * 0.5f + 10.f)),
+                    FMath::PerlinNoise3D(Particle.Position * 0.01f + FVector(WindTime * 0.5f + 20.f))
+                ) * WindTurbulence;
+                Particle.ApplyForce(WindStrength + Turbulence * WindStrength.Size());
+            }
 
             const FVector TempPosition = Particle.Position;
             // Verlet integration formula
